@@ -58,7 +58,7 @@
     header > h1 { margin-bottom: 10px; }
     .stats {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 12px;
     }
@@ -80,12 +80,18 @@
       background: var(--accent);
     }
     .stat:nth-child(2)::before { background: var(--ok); }
-    .stat:nth-child(4)::before { background: var(--warn); }
-    .stat:nth-child(5)::before { background: var(--accent-2); }
+    .stat:nth-child(3)::before { background: var(--warn); }
     .stat .label { color: var(--muted); font-size: 12px; }
     .stat .value { font-size: 21px; font-weight: 760; margin-top: 2px; letter-spacing: 0; }
+    .stat .hint {
+      color: var(--muted-2);
+      font-size: 11px;
+      line-height: 1.25;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
     .stat:nth-child(2) .value { color: var(--ok); }
-    .stat:nth-child(4) .value { color: var(--warn); }
+    .stat:nth-child(3) .value { color: var(--warn); }
     .controls {
       display: grid;
       grid-template-columns: minmax(260px, 1.6fr) repeat(7, minmax(108px, 1fr)) auto auto;
@@ -452,12 +458,9 @@
   <header>
     <h1>CVPR 2026 GitHub 开源统计</h1>
     <div class="stats">
-      <div class="stat"><div class="label">论文总数</div><div class="value" id="total">0</div></div>
-      <div class="stat"><div class="label">已确认 GitHub</div><div class="value" id="found">0</div></div>
-      <div class="stat"><div class="label">当前阶段进度</div><div class="value" id="phaseDone">0</div></div>
-      <div class="stat"><div class="label">未确认 GitHub</div><div class="value" id="needsSearch">0</div></div>
-      <div class="stat"><div class="label">唯一仓库</div><div class="value" id="repos">0</div></div>
-      <div class="stat"><div class="label">更新时间</div><div class="value small" id="updated">-</div></div>
+      <div class="stat"><div class="label">论文总数</div><div class="value" id="total">0</div><div class="hint">CVPR 页面解析出的论文条目</div></div>
+      <div class="stat"><div class="label">已核对论文数</div><div class="value" id="checked">0</div><div class="hint">已完成当前严格 GitHub 核对</div></div>
+      <div class="stat"><div class="label">剩余待核对论文数</div><div class="value" id="remaining">0</div><div class="hint">仍需继续搜索或复核</div></div>
     </div>
     <form class="controls" role="search" onsubmit="return false;">
       <label class="field" for="filter"><span>关键词</span><input id="filter" aria-label="关键词" placeholder="搜索标题、作者、摘要、GitHub"></label>
@@ -498,7 +501,7 @@
       <button id="refresh" class="secondary" type="button">刷新</button>
       <button id="clearFilters" class="ghost" type="button">清空</button>
     </form>
-    <div class="progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="已确认 GitHub 占论文总数比例"><div id="bar"></div></div>
+    <div class="progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="已核对论文占论文总数比例"><div id="bar"></div></div>
   </header>
   <main>
     <div class="resultBar">
@@ -730,23 +733,23 @@
       const statusCounts = progress.status_counts || {};
       const total = Number(progress.total_papers || rows.length || 0);
       const found = Number(statusCounts.github_found ?? rows.filter(row => row.status === "github_found").length);
-      const unconfirmed = Math.max(0, total - found);
-      el("total").textContent = fmt(total);
-      el("found").textContent = fmt(found);
       const workTotal = Number(progress.total_work || 0);
       const done = Number(progress.done_work || 0);
-      el("phaseDone").textContent = workTotal ? `${fmt(done)} / ${fmt(workTotal)}` : fmt(progress.github_api_done || 0);
-      el("needsSearch").textContent = fmt(unconfirmed);
-      el("repos").textContent = fmt(progress.unique_repos_seen || 0);
-      el("updated").textContent = progress.updated_at || "-";
-      const percent = total ? Math.max(0, Math.min(100, found * 100 / total)) : 0;
+      const remainingToCheck = workTotal ? Math.max(0, workTotal - done) : 0;
+      const checked = Math.max(0, total - remainingToCheck);
+      el("total").textContent = fmt(total);
+      el("checked").textContent = fmt(checked);
+      el("remaining").textContent = fmt(remainingToCheck);
+      const percent = total ? Math.max(0, Math.min(100, checked * 100 / total)) : 0;
       el("bar").style.width = `${percent}%`;
       document.querySelector(".progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
-      const openSourceText = `已确认 GitHub · ${fmt(found)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
+      const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
+      const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
       const phaseText = `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}`;
+      const reviewText = progress.deep_search_review_queue ? `候选待复核 · ${fmt(progress.deep_search_review_queue)}` : "";
       el("meta").textContent = window.innerWidth <= 760
-        ? openSourceText
-        : `${openSourceText} | ${phaseText} | ${fmt(rows.length)} 行 | ${progress.message || ""}`;
+        ? checkedText
+        : [checkedText, confirmedText, phaseText, reviewText, `更新时间 · ${progress.updated_at || "-"}`].filter(Boolean).join(" | ");
     }
 
     function progressKey() {
