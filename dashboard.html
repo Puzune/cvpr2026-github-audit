@@ -599,7 +599,11 @@
       huggingface_papers_arxiv_id: "HF Papers",
       paperswithcode_arxiv_id: "Papers with Code"
     }[value] || value || "-");
-    const chip = (label, value) => `<span class="chip">${label}<strong>${fmt(value)}</strong></span>`;
+    const chip = (label, value) => {
+      const numeric = Number(value);
+      const display = Number.isFinite(numeric) && String(value).trim() !== "" ? fmt(numeric) : esc(value);
+      return `<span class="chip">${label}<strong>${display}</strong></span>`;
+    };
     const selectedRenderCount = () => el("renderCount")?.value || "auto";
     const renderCountValue = value => {
       if (value === "all") return Number.POSITIVE_INFINITY;
@@ -748,7 +752,9 @@
         el("sort").value,
         el("typeFilter").value,
         el("statusFilter").value,
-        el("confidenceFilter").value
+        el("confidenceFilter").value,
+        selectedRenderCount(),
+        baseRenderLimit()
       ].join("|");
     }
 
@@ -889,7 +895,6 @@
       if (params.has("type")) el("typeFilter").value = params.get("type") || "";
       if (params.has("status")) el("statusFilter").value = params.get("status") || "";
       if (params.has("confidence")) el("confidenceFilter").value = params.get("confidence") || "";
-      if (params.has("render")) el("renderCount").value = params.get("render") || "auto";
     }
     function initRenderCount() {
       const saved = localStorage.getItem(RENDER_LIMIT_KEY);
@@ -907,8 +912,8 @@
     });
     window.addEventListener("resize", scheduleRender);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) load(true); });
-    initRenderCount();
     initFromUrl();
+    initRenderCount();
     load(true);
     setInterval(() => load(false), POLL_MS);
   </script>
