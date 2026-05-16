@@ -498,7 +498,7 @@
       <button id="refresh" class="secondary" type="button">刷新</button>
       <button id="clearFilters" class="ghost" type="button">清空</button>
     </form>
-    <div class="progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="当前阶段进度"><div id="bar"></div></div>
+    <div class="progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="已确认 GitHub 占论文总数比例"><div id="bar"></div></div>
   </header>
   <main>
     <div class="resultBar">
@@ -737,13 +737,14 @@
       el("updated").textContent = progress.updated_at || "-";
       const workTotal = Number(progress.total_work || 0);
       const done = Number(progress.done_work || 0);
-      const percent = workTotal ? Math.max(0, Math.min(100, done * 100 / workTotal)) : 0;
+      const percent = total ? Math.max(0, Math.min(100, found * 100 / total)) : 0;
       el("bar").style.width = `${percent}%`;
       document.querySelector(".progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
-      const phaseText = `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)} · ${percent.toFixed(1)}%`;
+      const openSourceText = `已确认 GitHub · ${fmt(found)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
+      const phaseText = `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}`;
       el("meta").textContent = window.innerWidth <= 760
-        ? phaseText
-        : `${phaseText} | ${fmt(rows.length)} 行 | ${progress.message || ""}`;
+        ? openSourceText
+        : `${openSourceText} | ${phaseText} | ${fmt(rows.length)} 行 | ${progress.message || ""}`;
     }
 
     function currentSignature() {
@@ -845,7 +846,6 @@
       try {
         const p = await fetch(`progress.json?ts=${stamp}`);
         if (p.ok) progress = await p.json();
-        renderStats();
         const resultKey = `${progress.updated_at || ""}|${progress.unique_repos_seen || ""}|${JSON.stringify(progress.status_counts || {})}`;
         const shouldFetchResults = force || !rows.length || (resultKey !== lastResultsKey && Date.now() - lastResultsFetchAt > RESULT_REFRESH_MS);
         if (shouldFetchResults) {
@@ -857,6 +857,8 @@
             renderStats();
             renderTable();
           }
+        } else {
+          renderStats();
         }
       } catch (err) {
         el("meta").textContent = `等待 HTTP 服务或结果文件: ${err}`;
