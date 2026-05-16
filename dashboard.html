@@ -576,8 +576,8 @@
       github_found: "已确认",
       checking: "查询中",
       pending: "待处理",
-      needs_title_search: "未找到可确认仓库",
-      not_found_in_checked_sources: "未找到",
+      needs_title_search: "已核对未找到可确认仓库",
+      not_found_in_checked_sources: "已核对未找到",
       not_found: "未找到"
     }[value] || value || "待处理");
     const confidenceLabel = value => ({
@@ -586,7 +586,7 @@
       reviewed_multiple_official_repos: "多官方仓库",
       shared_official_repo: "官方共享仓库",
       needs_deep_review: "候选待复核",
-      needs_title_search: "未找到可确认仓库"
+      needs_title_search: "已核对未找到可确认仓库"
     }[value] || value || "未标注");
     const phaseLabel = value => ({
       github_title_search: "GitHub 标题补查",
