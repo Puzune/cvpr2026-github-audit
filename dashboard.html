@@ -816,11 +816,8 @@
       const found = Number(statusCounts.github_found ?? rows.filter(row => row.status === "github_found").length);
       const workTotal = Number(progress.total_work || 0);
       const done = Math.max(0, Math.min(Number(progress.done_work || 0), workTotal || Number.POSITIVE_INFINITY));
-      const needsTitleSearch = Number(confidenceCounts.needs_title_search || 0);
       const needsDeepReview = Number(confidenceCounts.needs_deep_review || 0);
-      const unresolved = needsTitleSearch + needsDeepReview;
-      const confidenceTotal = Object.entries(confidenceCounts).reduce((sum, [label, count]) => label ? sum + Number(count || 0) : sum, 0);
-      const remainingToCheck = workTotal ? Math.max(0, workTotal - done) : (confidenceTotal ? unresolved : Math.max(0, total - found));
+      const remainingToCheck = workTotal ? Math.max(0, workTotal - done) : needsDeepReview;
       const checked = Math.max(0, Math.min(total, total - remainingToCheck));
       recordRateSample(remainingToCheck);
       const rate = currentRate();
