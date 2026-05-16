@@ -233,11 +233,16 @@
     .colTitle { width: auto; }
     .colStatus { width: 8%; }
     .colRepo { width: 34%; }
+    .repoHeader,
     .repoItem {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 72px 96px;
+      grid-template-columns: minmax(0, 1fr) 76px 132px;
       gap: 10px;
       align-items: baseline;
+    }
+    .repoHeader span:nth-child(2),
+    .repoHeader span:nth-child(3) {
+      text-align: right;
     }
     .repoItem + .repoItem { margin-top: 5px; }
     .repoMeta {
@@ -252,6 +257,7 @@
     .repoSource {
       color: var(--muted);
       white-space: nowrap;
+      text-align: right;
     }
     .stars { font-variant-numeric: tabular-nums; text-align: right; }
     .source { color: var(--muted); }
@@ -402,7 +408,7 @@
       .stars { font-size: 14px; }
       .repo { overflow-wrap: anywhere; }
       .repoItem {
-        grid-template-columns: minmax(0, 1fr) 56px 86px;
+        grid-template-columns: minmax(0, 1fr) 58px 112px;
         gap: 6px;
       }
       .title,
@@ -471,8 +477,8 @@
       <label class="field" for="sort"><span>排序</span><select id="sort" aria-label="排序">
         <option value="paper_id">PaperID</option>
         <option value="title">标题</option>
-        <option value="stars_desc">Stars 降序</option>
-        <option value="stars_asc">Stars 升序</option>
+        <option value="stars_desc">Stars 降序（仓库级）</option>
+        <option value="stars_asc">Stars 升序（仓库级）</option>
         <option value="status">状态</option>
         <option value="type">类型</option>
         <option value="repo_count">仓库数量</option>
@@ -507,7 +513,7 @@
             <th class="paperType" scope="col">类型</th>
             <th class="title" scope="col">标题</th>
             <th class="status" scope="col">状态</th>
-            <th class="repo" scope="col">GitHub / Stars / 证据源</th>
+            <th class="repo" scope="col"><div class="repoHeader"><span>GitHub</span><span>Stars</span><span>证据源</span></div></th>
           </tr>
         </thead>
         <tbody id="body"></tbody>
@@ -523,6 +529,7 @@
     let lastResultsKey = "";
     let lastResultsFetchAt = 0;
     let filterTimer = 0;
+    let repoUseCounts = new Map();
 
     const RESULT_REFRESH_MS = 12000;
     const POLL_MS = 3000;
@@ -560,6 +567,7 @@
       high: "高置信",
       medium_multiple_repos_review: "多仓库待复核",
       reviewed_multiple_official_repos: "多官方仓库",
+      shared_official_repo: "官方共享仓库",
       needs_deep_review: "候选待复核",
       needs_title_search: "待标题搜索"
     }[value] || value || "未标注");
@@ -624,6 +632,12 @@
     }
 
     function prepareRows(data) {
+      repoUseCounts = new Map();
+      data.forEach(row => {
+        (row.github_repos || []).forEach(repo => {
+          repoUseCounts.set(repo, (repoUseCounts.get(repo) || 0) + 1);
+        });
+      });
       rows = data.map(row => {
         row._maxStar = Math.max(0, ...(row.stars || []).map(value => Number(value) || 0));
         row._repoCount = (row.github_repos || []).length;
@@ -769,7 +783,8 @@
         const stars = row.stars || [];
         const sources = row.repo_sources || [];
         const repoHtml = repos.length ? repos.map((repo, i) => {
-          const source = `${sourceLabel(sources[i])}${row.repo_is_fork?.[i] === "True" ? " · fork" : ""}`;
+          const reuse = repoUseCounts.get(repo) || 0;
+          const source = `${sourceLabel(sources[i])}${row.repo_is_fork?.[i] === "True" ? " · fork" : ""}${reuse > 1 ? ` · 复用${reuse}篇` : ""}`;
           return `<div class="repoItem"><a href="${esc(repo)}" target="_blank" rel="noopener">${esc(repo.replace("https://github.com/", ""))}</a><span class="repoStars">${fmt(stars[i] || 0)}</span><span class="repoSource">${esc(source)}</span></div>`;
         }).join("") : "<span class='dim'>-</span>";
         const titleText = prettyMath(row.title || "");
