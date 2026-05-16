@@ -454,8 +454,8 @@
     <div class="stats">
       <div class="stat"><div class="label">论文总数</div><div class="value" id="total">0</div></div>
       <div class="stat"><div class="label">已确认 GitHub</div><div class="value" id="found">0</div></div>
-      <div class="stat"><div class="label">已查询 GitHub API</div><div class="value" id="apiDone">0</div></div>
-      <div class="stat"><div class="label">未确认仓库</div><div class="value" id="needsSearch">0</div></div>
+      <div class="stat"><div class="label">当前阶段进度</div><div class="value" id="phaseDone">0</div></div>
+      <div class="stat"><div class="label">未确认 GitHub</div><div class="value" id="needsSearch">0</div></div>
       <div class="stat"><div class="label">唯一仓库</div><div class="value" id="repos">0</div></div>
       <div class="stat"><div class="label">更新时间</div><div class="value small" id="updated">-</div></div>
     </div>
@@ -733,12 +733,12 @@
       const unconfirmed = Math.max(0, total - found);
       el("total").textContent = fmt(total);
       el("found").textContent = fmt(found);
-      el("apiDone").textContent = fmt(progress.github_api_done || 0);
+      const workTotal = Number(progress.total_work || 0);
+      const done = Number(progress.done_work || 0);
+      el("phaseDone").textContent = workTotal ? `${fmt(done)} / ${fmt(workTotal)}` : fmt(progress.github_api_done || 0);
       el("needsSearch").textContent = fmt(unconfirmed);
       el("repos").textContent = fmt(progress.unique_repos_seen || 0);
       el("updated").textContent = progress.updated_at || "-";
-      const workTotal = Number(progress.total_work || 0);
-      const done = Number(progress.done_work || 0);
       const percent = total ? Math.max(0, Math.min(100, found * 100 / total)) : 0;
       el("bar").style.width = `${percent}%`;
       document.querySelector(".progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
