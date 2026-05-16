@@ -459,8 +459,8 @@
     <h1>CVPR 2026 GitHub 开源统计</h1>
     <div class="stats">
       <div class="stat"><div class="label">论文总数</div><div class="value" id="total">0</div><div class="hint">CVPR 页面解析出的论文条目</div></div>
-      <div class="stat"><div class="label">已核对论文数</div><div class="value" id="checked">0</div><div class="hint">已完成当前严格 GitHub 核对</div></div>
-      <div class="stat"><div class="label">剩余待核对论文数</div><div class="value" id="remaining">0</div><div class="hint">仍需继续搜索或复核</div></div>
+      <div class="stat"><div class="label">已核对论文数</div><div class="value" id="checked">0</div><div class="hint">已强证据确认 GitHub</div></div>
+      <div class="stat"><div class="label">剩余待核对论文数</div><div class="value" id="remaining">0</div><div class="hint">未强证据确认；未命中不扣减</div></div>
     </div>
     <form class="controls" role="search" onsubmit="return false;">
       <label class="field" for="filter"><span>关键词</span><input id="filter" aria-label="关键词" placeholder="搜索标题、作者、摘要、GitHub"></label>
@@ -547,7 +547,7 @@
     let progressAvailable = true;
 
     const RENDER_LIMIT_KEY = "cvpr2026.githubAudit.renderCount";
-    const RATE_SAMPLES_KEY = "cvpr2026.githubAudit.rateSamples";
+    const RATE_SAMPLES_KEY = "cvpr2026.githubAudit.remainingRateSamples";
     const RESULT_REFRESH_MS = 60000;
     const POLL_MS = 3000;
     const el = id => document.getElementById(id);
@@ -643,8 +643,11 @@
       const parsed = Date.parse(value);
       return Number.isFinite(parsed) ? parsed : Date.now();
     };
-    const taskKey = () => [progress.phase || "", progress.total_work || "", progress.total_papers || ""].join("|");
-    const formatRate = rate => rate ? `${rate.toFixed(rate >= 10 ? 1 : 2)} 篇/分钟` : "计算中";
+    const taskKey = () => [progress.total_papers || rows.length || "", "remaining"].join("|");
+    const formatRate = rate => {
+      if (rate === null || rate === undefined || !Number.isFinite(rate)) return "计算中";
+      return `${rate.toFixed(rate >= 10 ? 1 : 2)} 篇/分钟`;
+    };
     const formatDuration = minutes => {
       if (!Number.isFinite(minutes)) return "计算中";
       if (minutes <= 0) return "0 分钟";
@@ -775,19 +778,18 @@
       }
     }
 
-    function recordRateSample() {
-      const total = Number(progress.total_work || 0);
-      const done = Number(progress.done_work || 0);
-      if (!total) return;
+    function recordRateSample(remainingToCheck) {
+      const remaining = Number(remainingToCheck);
+      if (!Number.isFinite(remaining) || !progress.updated_at) return;
       const key = taskKey();
       const ts = parseProgressTime(progress.updated_at);
       rateSamples = rateSamples.filter(sample => sample.taskKey === key);
       const last = rateSamples[rateSamples.length - 1];
-      if (last && last.ts === ts && last.done === done) return;
-      if (last && (done < last.done || ts < last.ts)) {
+      if (last && last.ts === ts && last.remaining === remaining) return;
+      if (last && (remaining > last.remaining || ts < last.ts)) {
         rateSamples = [];
       }
-      rateSamples.push({ taskKey: key, ts, done, total });
+      rateSamples.push({ taskKey: key, ts, remaining });
       const cutoff = ts - 10 * 60 * 1000;
       rateSamples = rateSamples.filter(sample => sample.ts >= cutoff).slice(-50);
       saveRateSamples();
@@ -796,10 +798,10 @@
     function currentRate() {
       const key = taskKey();
       const samples = rateSamples.filter(sample => sample.taskKey === key);
-      if (samples.length < 2) return 0;
+      if (samples.length < 2) return null;
       const last = samples[samples.length - 1];
       const first = samples[0];
-      const doneDelta = last.done - first.done;
+      const doneDelta = first.remaining - last.remaining;
       const minuteDelta = (last.ts - first.ts) / 60000;
       if (doneDelta <= 0 || minuteDelta <= 0) return 0;
       return doneDelta / minuteDelta;
@@ -813,15 +815,16 @@
       const total = Number(progress.total_papers || rows.length || 0);
       const found = Number(statusCounts.github_found ?? rows.filter(row => row.status === "github_found").length);
       const workTotal = Number(progress.total_work || 0);
-      const done = Number(progress.done_work || 0);
       const needsTitleSearch = Number(confidenceCounts.needs_title_search || 0);
       const needsDeepReview = Number(confidenceCounts.needs_deep_review || 0);
       const unresolved = needsTitleSearch + needsDeepReview;
-      const remainingToCheck = unresolved || (workTotal ? Math.max(0, workTotal - done) : 0);
+      const confidenceTotal = Object.entries(confidenceCounts).reduce((sum, [label, count]) => label ? sum + Number(count || 0) : sum, 0);
+      const remainingToCheck = confidenceTotal ? unresolved : Math.max(0, total - found);
       const checked = Math.max(0, total - remainingToCheck);
-      recordRateSample();
+      recordRateSample(remainingToCheck);
       const rate = currentRate();
-      const etaText = rate ? formatDuration(remainingToCheck / rate) : "计算中";
+      const rateLabel = rate === null ? "计算中" : formatRate(rate);
+      const etaText = rate === null ? "计算中" : (rate > 0 ? formatDuration(remainingToCheck / rate) : "暂无下降");
       el("total").textContent = fmt(total);
       el("checked").textContent = fmt(checked);
       el("remaining").textContent = fmt(remainingToCheck);
@@ -831,7 +834,7 @@
       const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
       const unconfirmedText = `当前未确认 · ${fmt(remainingToCheck)}`;
       const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
-      const rateText = workTotal ? `当前速率 · ${formatRate(rate)}` : "";
+      const rateText = workTotal ? `未确认下降速率 · ${rateLabel}` : "";
       const etaLine = workTotal ? `预计剩余 · ${etaText}` : "";
       const reviewText = needsDeepReview ? `候选待复核 · ${fmt(needsDeepReview)}` : "";
       const updatedText = progress.updated_at ? `更新时间 · ${progress.updated_at}` : "";
@@ -850,7 +853,8 @@
         progress.total_papers || "",
         progress.github_api_done || "",
         progress.unique_repos_seen || "",
-        JSON.stringify(progress.status_counts || {})
+        JSON.stringify(progress.status_counts || {}),
+        JSON.stringify(progress.confidence_counts || {})
       ].join("|");
     }
 
@@ -858,7 +862,8 @@
       return [
         progress.total_papers || "",
         progress.unique_repos_seen || "",
-        JSON.stringify(progress.status_counts || {})
+        JSON.stringify(progress.status_counts || {}),
+        JSON.stringify(progress.confidence_counts || {})
       ].join("|");
     }
 
