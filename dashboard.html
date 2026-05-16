@@ -731,11 +731,15 @@
 
     function renderStats() {
       const statusCounts = progress.status_counts || {};
+      const confidenceCounts = progress.confidence_counts || {};
       const total = Number(progress.total_papers || rows.length || 0);
       const found = Number(statusCounts.github_found ?? rows.filter(row => row.status === "github_found").length);
       const workTotal = Number(progress.total_work || 0);
       const done = Number(progress.done_work || 0);
-      const remainingToCheck = workTotal ? Math.max(0, workTotal - done) : 0;
+      const needsTitleSearch = Number(confidenceCounts.needs_title_search || 0);
+      const needsDeepReview = Number(confidenceCounts.needs_deep_review || 0);
+      const unresolved = needsTitleSearch + needsDeepReview;
+      const remainingToCheck = unresolved || (workTotal ? Math.max(0, workTotal - done) : 0);
       const checked = Math.max(0, total - remainingToCheck);
       el("total").textContent = fmt(total);
       el("checked").textContent = fmt(checked);
@@ -746,7 +750,7 @@
       const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
       const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
       const phaseText = `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}`;
-      const reviewText = progress.deep_search_review_queue ? `候选待复核 · ${fmt(progress.deep_search_review_queue)}` : "";
+      const reviewText = needsDeepReview ? `候选待复核 · ${fmt(needsDeepReview)}` : "";
       el("meta").textContent = window.innerWidth <= 760
         ? checkedText
         : [checkedText, confirmedText, phaseText, reviewText, `更新时间 · ${progress.updated_at || "-"}`].filter(Boolean).join(" | ");
