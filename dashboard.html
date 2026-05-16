@@ -821,8 +821,7 @@
       const checked = Math.max(0, total - remainingToCheck);
       recordRateSample();
       const rate = currentRate();
-      const currentRoundRemaining = workTotal ? Math.max(0, workTotal - done) : remainingToCheck;
-      const etaText = rate ? formatDuration(currentRoundRemaining / rate) : "计算中";
+      const etaText = rate ? formatDuration(remainingToCheck / rate) : "计算中";
       el("total").textContent = fmt(total);
       el("checked").textContent = fmt(checked);
       el("remaining").textContent = fmt(remainingToCheck);
@@ -830,15 +829,15 @@
       el("bar").style.width = `${percent}%`;
       document.querySelector(".progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
       const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
+      const unconfirmedText = `当前未确认 · ${fmt(remainingToCheck)}`;
       const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
-      const phaseText = workTotal ? `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}` : "";
-      const rateText = workTotal ? `当前轮速率 · ${formatRate(rate)}` : "";
-      const etaLine = workTotal ? `本轮预计剩余 · ${etaText}` : "";
+      const rateText = workTotal ? `当前速率 · ${formatRate(rate)}` : "";
+      const etaLine = workTotal ? `预计剩余 · ${etaText}` : "";
       const reviewText = needsDeepReview ? `候选待复核 · ${fmt(needsDeepReview)}` : "";
       const updatedText = progress.updated_at ? `更新时间 · ${progress.updated_at}` : "";
       el("meta").textContent = window.innerWidth <= 760
         ? checkedText
-        : [checkedText, confirmedText, phaseText, rateText, etaLine, reviewText, updatedText].filter(Boolean).join(" | ");
+        : [checkedText, unconfirmedText, confirmedText, rateText, etaLine, reviewText, updatedText].filter(Boolean).join(" | ");
     }
 
     function progressKey() {
