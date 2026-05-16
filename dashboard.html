@@ -536,11 +536,13 @@
     let lastViewSignature = "";
     let lastResultsKey = "";
     let lastResultsFetchAt = 0;
+    let lastProgressKey = "";
     let filterTimer = 0;
+    let pollTimer = 0;
     let repoUseCounts = new Map();
 
     const RENDER_LIMIT_KEY = "cvpr2026.githubAudit.renderCount";
-    const RESULT_REFRESH_MS = 12000;
+    const RESULT_REFRESH_MS = 60000;
     const POLL_MS = 3000;
     const el = id => document.getElementById(id);
     const fmt = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString() : "0";
@@ -747,6 +749,36 @@
         : `${openSourceText} | ${phaseText} | ${fmt(rows.length)} 行 | ${progress.message || ""}`;
     }
 
+    function progressKey() {
+      return [
+        progress.updated_at || "",
+        progress.phase || "",
+        progress.message || "",
+        progress.done_work || "",
+        progress.total_work || "",
+        progress.total_papers || "",
+        progress.github_api_done || "",
+        progress.unique_repos_seen || "",
+        JSON.stringify(progress.status_counts || {})
+      ].join("|");
+    }
+
+    function resultsKey() {
+      return [
+        progress.total_papers || "",
+        progress.unique_repos_seen || "",
+        JSON.stringify(progress.status_counts || {})
+      ].join("|");
+    }
+
+    function renderStatsIfChanged(force = false) {
+      const key = progressKey();
+      if (force || key !== lastProgressKey) {
+        lastProgressKey = key;
+        renderStats();
+      }
+    }
+
     function currentSignature() {
       return [
         el("filter").value.trim(),
@@ -846,19 +878,24 @@
       try {
         const p = await fetch(`progress.json?ts=${stamp}`);
         if (p.ok) progress = await p.json();
-        const resultKey = `${progress.updated_at || ""}|${progress.unique_repos_seen || ""}|${JSON.stringify(progress.status_counts || {})}`;
-        const shouldFetchResults = force || !rows.length || (resultKey !== lastResultsKey && Date.now() - lastResultsFetchAt > RESULT_REFRESH_MS);
+        const resultKey = resultsKey();
+        const resultsChanged = resultKey !== lastResultsKey;
+        const resultsStale = Date.now() - lastResultsFetchAt > RESULT_REFRESH_MS;
+        const shouldFetchResults = force || !rows.length || resultsChanged || resultsStale;
+        let refreshedResults = false;
         if (shouldFetchResults) {
           const r = await fetch(`results_live.json?ts=${stamp}`);
           if (r.ok) {
             prepareRows(await r.json());
             lastResultsKey = resultKey;
             lastResultsFetchAt = Date.now();
-            renderStats();
+            renderStatsIfChanged(true);
             renderTable();
+            refreshedResults = true;
           }
-        } else {
-          renderStats();
+        }
+        if (!refreshedResults) {
+          renderStatsIfChanged();
         }
       } catch (err) {
         el("meta").textContent = `等待 HTTP 服务或结果文件: ${err}`;
@@ -915,11 +952,12 @@
       }
     });
     window.addEventListener("resize", scheduleRender);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) load(true); });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) load(false); });
     initFromUrl();
     initRenderCount();
     load(true);
-    setInterval(() => load(false), POLL_MS);
+    pollTimer = setInterval(() => load(false), POLL_MS);
+    window.addEventListener("pagehide", () => clearInterval(pollTimer));
   </script>
 </body>
 </html>
