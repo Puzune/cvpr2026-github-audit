@@ -6,6 +6,11 @@ Data source:
 
 - `results_live.json`: complete JSON array of paper records, including paper metadata, confirmed GitHub repositories, evidence, status, confidence labels, and review notes.
 
-Only the README and canonical JSON data source are pushed to GitHub. The local dashboard, progress file, CSV export, and helper scripts are generated or maintained locally.
+Visualization:
+
+- `index.html`: public entrypoint.
+- `dashboard.html`: static GitHub Pages viewer that reads `results_live.json`.
+
+Only the canonical JSON data source is updated by the recurring sync. The progress file, CSV export, and helper scripts are generated or maintained locally.
 
 Confidence labels distinguish direct/high-confidence matches, reviewed multi-repository official artifacts, candidates that need review, and papers still needing title search.
