@@ -459,8 +459,8 @@
     <h1>CVPR 2026 GitHub 开源统计</h1>
     <div class="stats">
       <div class="stat"><div class="label">论文总数</div><div class="value" id="total">0</div><div class="hint">CVPR 页面解析出的论文条目</div></div>
-      <div class="stat"><div class="label">已核对论文数</div><div class="value" id="checked">0</div><div class="hint">已强证据确认 GitHub</div></div>
-      <div class="stat"><div class="label">剩余待核对论文数</div><div class="value" id="remaining">0</div><div class="hint">未强证据确认；未命中不扣减</div></div>
+      <div class="stat"><div class="label">已核对论文数</div><div class="value" id="checked">0</div><div class="hint">当前核对任务已处理</div></div>
+      <div class="stat"><div class="label">剩余待核对论文数</div><div class="value" id="remaining">0</div><div class="hint">当前核对任务未处理</div></div>
     </div>
     <form class="controls" role="search" onsubmit="return false;">
       <label class="field" for="filter"><span>关键词</span><input id="filter" aria-label="关键词" placeholder="搜索标题、作者、摘要、GitHub"></label>
@@ -547,7 +547,7 @@
     let progressAvailable = true;
 
     const RENDER_LIMIT_KEY = "cvpr2026.githubAudit.renderCount";
-    const RATE_SAMPLES_KEY = "cvpr2026.githubAudit.remainingRateSamples";
+    const RATE_SAMPLES_KEY = "cvpr2026.githubAudit.auditTaskRateSamples";
     const RESULT_REFRESH_MS = 60000;
     const POLL_MS = 3000;
     const el = id => document.getElementById(id);
@@ -643,7 +643,7 @@
       const parsed = Date.parse(value);
       return Number.isFinite(parsed) ? parsed : Date.now();
     };
-    const taskKey = () => [progress.total_papers || rows.length || "", "remaining"].join("|");
+    const taskKey = () => [progress.phase || "", progress.total_work || "", progress.total_papers || rows.length || "", "audit-task"].join("|");
     const formatRate = rate => {
       if (rate === null || rate === undefined || !Number.isFinite(rate)) return "计算中";
       return `${rate.toFixed(rate >= 10 ? 1 : 2)} 篇/分钟`;
@@ -815,12 +815,13 @@
       const total = Number(progress.total_papers || rows.length || 0);
       const found = Number(statusCounts.github_found ?? rows.filter(row => row.status === "github_found").length);
       const workTotal = Number(progress.total_work || 0);
+      const done = Math.max(0, Math.min(Number(progress.done_work || 0), workTotal || Number.POSITIVE_INFINITY));
       const needsTitleSearch = Number(confidenceCounts.needs_title_search || 0);
       const needsDeepReview = Number(confidenceCounts.needs_deep_review || 0);
       const unresolved = needsTitleSearch + needsDeepReview;
       const confidenceTotal = Object.entries(confidenceCounts).reduce((sum, [label, count]) => label ? sum + Number(count || 0) : sum, 0);
-      const remainingToCheck = confidenceTotal ? unresolved : Math.max(0, total - found);
-      const checked = Math.max(0, total - remainingToCheck);
+      const remainingToCheck = workTotal ? Math.max(0, workTotal - done) : (confidenceTotal ? unresolved : Math.max(0, total - found));
+      const checked = Math.max(0, Math.min(total, total - remainingToCheck));
       recordRateSample(remainingToCheck);
       const rate = currentRate();
       const rateLabel = rate === null ? "计算中" : formatRate(rate);
@@ -832,15 +833,14 @@
       el("bar").style.width = `${percent}%`;
       document.querySelector(".progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
       const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
-      const unconfirmedText = `当前未确认 · ${fmt(remainingToCheck)}`;
+      const taskText = workTotal ? `当前任务 · ${fmt(done)} / ${fmt(workTotal)}` : "";
       const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
-      const rateText = workTotal ? `未确认下降速率 · ${rateLabel}` : "";
+      const rateText = workTotal ? `核对速率 · ${rateLabel}` : "";
       const etaLine = workTotal ? `预计剩余 · ${etaText}` : "";
-      const reviewText = needsDeepReview ? `候选待复核 · ${fmt(needsDeepReview)}` : "";
       const updatedText = progress.updated_at ? `更新时间 · ${progress.updated_at}` : "";
       el("meta").textContent = window.innerWidth <= 760
         ? checkedText
-        : [checkedText, unconfirmedText, confirmedText, rateText, etaLine, reviewText, updatedText].filter(Boolean).join(" | ");
+        : [checkedText, taskText, confirmedText, rateText, etaLine, updatedText].filter(Boolean).join(" | ");
     }
 
     function progressKey() {
