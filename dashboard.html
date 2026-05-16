@@ -543,8 +543,10 @@
     let filterTimer = 0;
     let pollTimer = 0;
     let repoUseCounts = new Map();
+    let rateSamples = [];
 
     const RENDER_LIMIT_KEY = "cvpr2026.githubAudit.renderCount";
+    const RATE_SAMPLES_KEY = "cvpr2026.githubAudit.rateSamples";
     const RESULT_REFRESH_MS = 60000;
     const POLL_MS = 3000;
     const el = id => document.getElementById(id);
@@ -624,6 +626,32 @@
       if (value === "all") return "全部";
       if (value === "auto") return `${fmt(baseRenderLimit())} 自动`;
       return fmt(baseRenderLimit());
+    };
+    const parseProgressTime = value => {
+      const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+      if (match) {
+        return new Date(
+          Number(match[1]),
+          Number(match[2]) - 1,
+          Number(match[3]),
+          Number(match[4]),
+          Number(match[5]),
+          Number(match[6])
+        ).getTime();
+      }
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? parsed : Date.now();
+    };
+    const taskKey = () => [progress.phase || "", progress.total_work || "", progress.total_papers || ""].join("|");
+    const formatRate = rate => rate ? `${rate.toFixed(rate >= 10 ? 1 : 2)} 篇/分钟` : "计算中";
+    const formatDuration = minutes => {
+      if (!Number.isFinite(minutes)) return "计算中";
+      if (minutes <= 0) return "0 分钟";
+      if (minutes < 1) return "小于 1 分钟";
+      if (minutes < 60) return `${Math.ceil(minutes)} 分钟`;
+      const hours = Math.floor(minutes / 60);
+      const rest = Math.ceil(minutes % 60);
+      return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
     };
     const maxStar = row => row._maxStar || 0;
     const countBy = (items, key) => items.reduce((acc, item) => {
@@ -729,6 +757,53 @@
       return `${start > 0 ? "... " : ""}${snippet}${start + max < value.length ? " ..." : ""}`;
     }
 
+    function loadRateSamples() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(RATE_SAMPLES_KEY) || "[]");
+        rateSamples = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        rateSamples = [];
+      }
+    }
+
+    function saveRateSamples() {
+      try {
+        localStorage.setItem(RATE_SAMPLES_KEY, JSON.stringify(rateSamples.slice(-50)));
+      } catch {
+        // Ignore storage failures; rate estimation can restart from fresh samples.
+      }
+    }
+
+    function recordRateSample() {
+      const total = Number(progress.total_work || 0);
+      const done = Number(progress.done_work || 0);
+      if (!total) return;
+      const key = taskKey();
+      const ts = parseProgressTime(progress.updated_at);
+      rateSamples = rateSamples.filter(sample => sample.taskKey === key);
+      const last = rateSamples[rateSamples.length - 1];
+      if (last && last.ts === ts && last.done === done) return;
+      if (last && (done < last.done || ts < last.ts)) {
+        rateSamples = [];
+      }
+      rateSamples.push({ taskKey: key, ts, done, total });
+      const cutoff = ts - 10 * 60 * 1000;
+      rateSamples = rateSamples.filter(sample => sample.ts >= cutoff).slice(-50);
+      saveRateSamples();
+    }
+
+    function currentRate() {
+      const key = taskKey();
+      const samples = rateSamples.filter(sample => sample.taskKey === key);
+      if (samples.length < 2) return 0;
+      const last = samples[samples.length - 1];
+      const first = samples[0];
+      const doneDelta = last.done - first.done;
+      const minuteDelta = (last.ts - first.ts) / 60000;
+      if (doneDelta <= 0 || minuteDelta <= 0) return 0;
+      return doneDelta / minuteDelta;
+    }
+
     function renderStats() {
       const statusCounts = progress.status_counts || {};
       const confidenceCounts = progress.confidence_counts || {};
@@ -741,6 +816,10 @@
       const unresolved = needsTitleSearch + needsDeepReview;
       const remainingToCheck = unresolved || (workTotal ? Math.max(0, workTotal - done) : 0);
       const checked = Math.max(0, total - remainingToCheck);
+      recordRateSample();
+      const rate = currentRate();
+      const currentRoundRemaining = workTotal ? Math.max(0, workTotal - done) : remainingToCheck;
+      const etaText = rate ? formatDuration(currentRoundRemaining / rate) : "计算中";
       el("total").textContent = fmt(total);
       el("checked").textContent = fmt(checked);
       el("remaining").textContent = fmt(remainingToCheck);
@@ -750,10 +829,12 @@
       const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
       const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
       const phaseText = `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}`;
+      const rateText = `当前轮速率 · ${formatRate(rate)}`;
+      const etaLine = `本轮预计剩余 · ${etaText}`;
       const reviewText = needsDeepReview ? `候选待复核 · ${fmt(needsDeepReview)}` : "";
       el("meta").textContent = window.innerWidth <= 760
         ? checkedText
-        : [checkedText, confirmedText, phaseText, reviewText, `更新时间 · ${progress.updated_at || "-"}`].filter(Boolean).join(" | ");
+        : [checkedText, confirmedText, phaseText, rateText, etaLine, reviewText, `更新时间 · ${progress.updated_at || "-"}`].filter(Boolean).join(" | ");
     }
 
     function progressKey() {
@@ -960,6 +1041,7 @@
     });
     window.addEventListener("resize", scheduleRender);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) load(false); });
+    loadRateSamples();
     initFromUrl();
     initRenderCount();
     load(true);
