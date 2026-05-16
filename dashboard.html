@@ -88,7 +88,7 @@
     .stat:nth-child(4) .value { color: var(--warn); }
     .controls {
       display: grid;
-      grid-template-columns: minmax(280px, 1.8fr) repeat(6, minmax(112px, 1fr)) auto auto;
+      grid-template-columns: minmax(260px, 1.6fr) repeat(7, minmax(108px, 1fr)) auto auto;
       gap: 9px;
       align-items: end;
       padding: 10px;
@@ -487,6 +487,14 @@
       <label class="field" for="typeFilter"><span>类型</span><select id="typeFilter" aria-label="论文类型"></select></label>
       <label class="field" for="statusFilter"><span>状态</span><select id="statusFilter" aria-label="开源状态"></select></label>
       <label class="field" for="confidenceFilter"><span>置信度</span><select id="confidenceFilter" aria-label="置信度"></select></label>
+      <label class="field" for="renderCount"><span>显示</span><select id="renderCount" aria-label="每次渲染行数">
+        <option value="auto">自动</option>
+        <option value="100">100 行</option>
+        <option value="500">500 行</option>
+        <option value="1000">1,000 行</option>
+        <option value="2000">2,000 行</option>
+        <option value="all">全部</option>
+      </select></label>
       <button id="refresh" class="secondary" type="button">刷新</button>
       <button id="clearFilters" class="ghost" type="button">清空</button>
     </form>
@@ -531,6 +539,7 @@
     let filterTimer = 0;
     let repoUseCounts = new Map();
 
+    const RENDER_LIMIT_KEY = "cvpr2026.githubAudit.renderCount";
     const RESULT_REFRESH_MS = 12000;
     const POLL_MS = 3000;
     const el = id => document.getElementById(id);
@@ -591,7 +600,20 @@
       paperswithcode_arxiv_id: "Papers with Code"
     }[value] || value || "-");
     const chip = (label, value) => `<span class="chip">${label}<strong>${fmt(value)}</strong></span>`;
-    const baseRenderLimit = () => window.innerWidth <= 760 ? 60 : 500;
+    const selectedRenderCount = () => el("renderCount")?.value || "auto";
+    const renderCountValue = value => {
+      if (value === "all") return Number.POSITIVE_INFINITY;
+      const numeric = Number(value);
+      if (Number.isFinite(numeric) && numeric > 0) return numeric;
+      return window.innerWidth <= 760 ? 60 : 500;
+    };
+    const baseRenderLimit = () => renderCountValue(selectedRenderCount());
+    const renderCountLabel = () => {
+      const value = selectedRenderCount();
+      if (value === "all") return "全部";
+      if (value === "auto") return `${fmt(baseRenderLimit())} 自动`;
+      return fmt(baseRenderLimit());
+    };
     const maxStar = row => row._maxStar || 0;
     const countBy = (items, key) => items.reduce((acc, item) => {
       const value = item[key] || "";
@@ -769,6 +791,7 @@
       const sample = visible.slice(0, renderLimit);
       el("visibleStats").innerHTML = [
         chip("命中", visible.length),
+        chip("显示", renderCountLabel()),
         chip("已确认", stats.found),
         chip("Oral", stats.oral),
         chip("Poster", stats.poster),
@@ -841,6 +864,12 @@
 
     el("filter").addEventListener("input", scheduleRender);
     ["searchScope", "searchMode", "sort", "typeFilter", "statusFilter", "confidenceFilter"].forEach(id => el(id).addEventListener("input", renderTable));
+    el("renderCount").addEventListener("input", () => {
+      localStorage.setItem(RENDER_LIMIT_KEY, el("renderCount").value);
+      renderLimit = baseRenderLimit();
+      lastViewSignature = "";
+      renderTable();
+    });
     el("refresh").addEventListener("click", () => load(true));
     el("clearFilters").addEventListener("click", () => {
       ["filter", "searchScope", "searchMode", "sort", "typeFilter", "statusFilter", "confidenceFilter"].forEach(id => {
@@ -860,6 +889,15 @@
       if (params.has("type")) el("typeFilter").value = params.get("type") || "";
       if (params.has("status")) el("statusFilter").value = params.get("status") || "";
       if (params.has("confidence")) el("confidenceFilter").value = params.get("confidence") || "";
+      if (params.has("render")) el("renderCount").value = params.get("render") || "auto";
+    }
+    function initRenderCount() {
+      const saved = localStorage.getItem(RENDER_LIMIT_KEY);
+      const allowed = [...el("renderCount").options].map(option => option.value);
+      const params = new URLSearchParams(location.search);
+      const requested = params.get("render");
+      const next = requested || saved || "auto";
+      el("renderCount").value = allowed.includes(next) ? next : "auto";
     }
     document.addEventListener("click", event => {
       if (event.target?.id === "showMoreRows") {
@@ -869,6 +907,7 @@
     });
     window.addEventListener("resize", scheduleRender);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) load(true); });
+    initRenderCount();
     initFromUrl();
     load(true);
     setInterval(() => load(false), POLL_MS);
