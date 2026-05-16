@@ -14,4 +14,4 @@ Tracked files:
 - `cvpr2026_papers_github_status_live.csv`: downloadable CSV export.
 - `cvpr2026_papers_github_status_live.jsonl`: downloadable JSONL export.
 
-The data is updated from a local audit process. Confidence labels distinguish direct/high-confidence matches, reviewed multi-repository official artifacts, and papers still needing title search.
+The data is updated from a local audit process. Confidence labels distinguish direct/high-confidence matches, reviewed multi-repository official artifacts, and papers still needing title search. In the CSV export, list-valued columns are JSON arrays so embedded semicolons remain round-trippable.
