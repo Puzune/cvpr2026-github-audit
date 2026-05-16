@@ -8,6 +8,7 @@ FILES=(
   .gitignore
   .nojekyll
   README.md
+  index.html
   dashboard.html
   results_live.json
   progress.json

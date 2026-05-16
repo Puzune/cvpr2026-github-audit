@@ -2,6 +2,7 @@
 !.gitignore
 !README.md
 !.nojekyll
+!index.html
 !dashboard.html
 !results_live.json
 !progress.json
