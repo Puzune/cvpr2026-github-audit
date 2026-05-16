@@ -544,6 +544,7 @@
     let pollTimer = 0;
     let repoUseCounts = new Map();
     let rateSamples = [];
+    let progressAvailable = true;
 
     const RENDER_LIMIT_KEY = "cvpr2026.githubAudit.renderCount";
     const RATE_SAMPLES_KEY = "cvpr2026.githubAudit.rateSamples";
@@ -805,8 +806,10 @@
     }
 
     function renderStats() {
-      const statusCounts = progress.status_counts || {};
-      const confidenceCounts = progress.confidence_counts || {};
+      const progressStatusCounts = progress.status_counts || {};
+      const progressConfidenceCounts = progress.confidence_counts || {};
+      const statusCounts = Object.keys(progressStatusCounts).length ? progressStatusCounts : countBy(rows, "status");
+      const confidenceCounts = Object.keys(progressConfidenceCounts).length ? progressConfidenceCounts : countBy(rows, "confidence");
       const total = Number(progress.total_papers || rows.length || 0);
       const found = Number(statusCounts.github_found ?? rows.filter(row => row.status === "github_found").length);
       const workTotal = Number(progress.total_work || 0);
@@ -828,13 +831,14 @@
       document.querySelector(".progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
       const checkedText = `已核对 · ${fmt(checked)} / ${fmt(total)} · ${percent.toFixed(1)}%`;
       const confirmedText = `强证据确认 GitHub · ${fmt(found)}`;
-      const phaseText = `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}`;
-      const rateText = `当前轮速率 · ${formatRate(rate)}`;
-      const etaLine = `本轮预计剩余 · ${etaText}`;
+      const phaseText = workTotal ? `${phaseLabel(progress.phase)} · ${fmt(done)} / ${fmt(workTotal)}` : "";
+      const rateText = workTotal ? `当前轮速率 · ${formatRate(rate)}` : "";
+      const etaLine = workTotal ? `本轮预计剩余 · ${etaText}` : "";
       const reviewText = needsDeepReview ? `候选待复核 · ${fmt(needsDeepReview)}` : "";
+      const updatedText = progress.updated_at ? `更新时间 · ${progress.updated_at}` : "";
       el("meta").textContent = window.innerWidth <= 760
         ? checkedText
-        : [checkedText, confirmedText, phaseText, rateText, etaLine, reviewText, `更新时间 · ${progress.updated_at || "-"}`].filter(Boolean).join(" | ");
+        : [checkedText, confirmedText, phaseText, rateText, etaLine, reviewText, updatedText].filter(Boolean).join(" | ");
     }
 
     function progressKey() {
@@ -964,8 +968,15 @@
       loading = true;
       const stamp = Date.now();
       try {
-        const p = await fetch(`progress.json?ts=${stamp}`);
-        if (p.ok) progress = await p.json();
+        if (progressAvailable) {
+          const p = await fetch(`progress.json?ts=${stamp}`);
+          if (p.ok) {
+            progress = await p.json();
+          } else if (p.status === 404) {
+            progressAvailable = false;
+            progress = {};
+          }
+        }
         const resultKey = resultsKey();
         const resultsChanged = resultKey !== lastResultsKey;
         const resultsStale = Date.now() - lastResultsFetchAt > RESULT_REFRESH_MS;

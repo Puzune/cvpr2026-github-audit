@@ -1,53 +1,57 @@
 # CVPR 2026 GitHub Open Source Audit
 
-Language: [中文](#中文) | [English](#english)
+**Dashboard / 可视化网站:** https://puzune.github.io/cvpr2026-github-audit/
 
-<a id="中文"></a>
+**Language / 语言:** [中文](#zh) | [EN](#en)
+
+<a id="zh"></a>
 
 ## 中文
 
-这是一个用于跟踪 CVPR 2026 论文 GitHub 开源状态与 star 数的数据集和可视化页面。
+本项目跟踪 CVPR 2026 论文的 GitHub 开源状态、仓库证据和 star 数，并提供公开可视化页面。
 
-### 可视化网站
+### 快速入口
 
-https://puzune.github.io/cvpr2026-github-audit/
+- 可视化网站：https://puzune.github.io/cvpr2026-github-audit/
+- 规范数据源：[`results_live.json`](results_live.json)
 
-### 数据源
+### 公开文件
 
-- `results_live.json`：唯一的规范数据源，包含论文元数据、已确认 GitHub 仓库、证据、状态、置信度标签和复核备注。
-
-### 网站文件
-
-- `index.html`：公开入口。
-- `dashboard.html`：读取 `results_live.json` 的 GitHub Pages 静态可视化页面。
+- `results_live.json`：唯一自动更新的数据源，包含论文信息、GitHub 仓库、证据、状态、置信度和复核备注。
+- `dashboard.html`：GitHub Pages 可视化页面，读取 `results_live.json`。
+- `index.html`：网站入口，跳转到 `dashboard.html`。
+- `README.md`：项目说明。
 
 ### 同步策略
 
-定期同步只更新 `results_live.json` 这一份规范数据源。进度文件、CSV 导出、本地脚本和日志只在本地生成和维护，不推送到 GitHub。
+自动同步只更新 `results_live.json`。页面壳文件和 README 手动维护；进度文件、CSV 导出、本地脚本和日志只保存在本地。
 
-置信度标签用于区分强证据确认、已复核的多仓库官方产物、候选待复核，以及仍需标题搜索的论文。
+### 置信度说明
 
-<a id="english"></a>
+`confidence` 字段用于区分强证据确认、已复核的多仓库官方产物、候选待复核，以及仍需标题搜索的论文。
 
-## English
+<a id="en"></a>
 
-This repository provides a dataset and visualization page for tracking GitHub repository availability and star counts for papers listed on the CVPR 2026 paper index.
+## EN
 
-### Dashboard
+This project tracks GitHub repository availability, repository evidence, and star counts for CVPR 2026 papers, with a public visualization page.
 
-https://puzune.github.io/cvpr2026-github-audit/
+### Quick Links
 
-### Data Source
+- Dashboard: https://puzune.github.io/cvpr2026-github-audit/
+- Canonical data source: [`results_live.json`](results_live.json)
 
-- `results_live.json`: the canonical data source, containing paper metadata, confirmed GitHub repositories, evidence, status, confidence labels, and review notes.
+### Published Files
 
-### Website Files
-
-- `index.html`: public entrypoint.
-- `dashboard.html`: static GitHub Pages viewer that reads `results_live.json`.
+- `results_live.json`: the only automatically updated data source, containing paper metadata, GitHub repositories, evidence, status, confidence labels, and review notes.
+- `dashboard.html`: GitHub Pages visualization page that reads `results_live.json`.
+- `index.html`: website entrypoint that redirects to `dashboard.html`.
+- `README.md`: project documentation.
 
 ### Sync Policy
 
-The recurring sync updates only the canonical JSON data source, `results_live.json`. Progress files, CSV exports, local helper scripts, and logs are generated and maintained locally rather than pushed to GitHub.
+The automatic sync updates only `results_live.json`. The static page shell and README are maintained manually; progress files, CSV exports, local scripts, and logs stay local.
 
-Confidence labels distinguish strong-evidence matches, reviewed multi-repository official artifacts, candidates that need review, and papers still needing title search.
+### Confidence Labels
+
+The `confidence` field distinguishes strong-evidence matches, reviewed multi-repository official artifacts, candidates that need review, and papers still needing title search.
